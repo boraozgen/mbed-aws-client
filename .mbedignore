@@ -1,4 +1,4 @@
-Device-Shadow-for-AWS-IoT-embedded-sdk/test/*
+shadow/test/*
 coreJSON/test/*
 coreMQTT/test/*
 test/*

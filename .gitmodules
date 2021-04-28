@@ -1,0 +1,9 @@
+[submodule "coreJSON"]
+	path = coreJSON
+	url = https://github.com/FreeRTOS/coreJSON.git
+[submodule "coreMQTT"]
+	path = coreMQTT
+	url = https://github.com/FreeRTOS/coreMQTT.git
+[submodule "shadow"]
+	path = shadow
+	url = https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk.git

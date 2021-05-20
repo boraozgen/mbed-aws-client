@@ -64,6 +64,7 @@ target_include_directories(mbed-client-for-aws
 target_sources(mbed-client-for-aws
     INTERFACE
         source/AWSClient.cpp
+        source/mqtt_subscription_manager.c
 )
 
 target_link_libraries(mbed-client-for-aws

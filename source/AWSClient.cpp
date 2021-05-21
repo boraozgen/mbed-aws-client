@@ -499,7 +499,7 @@ int AWSClient::publishShadowReportedValue(const char *key, size_t key_length, co
             key_length, key, value_length, value);
 
     // Publish update document
-    auto ret = updateShadowDocument(updateDocument, strlen(updateDocument));
+    auto ret = updateShadowDocument(SHADOW_NAME_CLASSIC, 0, updateDocument, strlen(updateDocument));
     if (ret != 0) {
         tr_error("updateShadowDocument error: %d", ret);
         return ret;
@@ -523,7 +523,7 @@ int AWSClient::publishShadowReportedValue(const char *key, size_t key_length, in
             key_length, key, value);
 
     // Publish update document
-    auto ret = updateShadowDocument(updateDocument, strlen(updateDocument));
+    auto ret = updateShadowDocument(SHADOW_NAME_CLASSIC, 0, updateDocument, strlen(updateDocument));
     if (ret != 0) {
         tr_error("updateShadowDocument error: %d", ret);
         return ret;
@@ -532,7 +532,7 @@ int AWSClient::publishShadowReportedValue(const char *key, size_t key_length, in
     return 0;
 }
 
-int AWSClient::downloadShadowDocument()
+int AWSClient::downloadShadowDocument(const char *shadowName, size_t shadowNameLength)
 {
     static char getAcceptedTopicBuffer[MBED_CONF_AWS_CLIENT_SHADOW_TOPIC_MAX_SIZE] = {0};
     uint16_t getAcceptedTopicLength = 0;
@@ -543,12 +543,14 @@ int AWSClient::downloadShadowDocument()
     shadowGetAccepted = false;
 
     // Construct get/accepted topic
-    auto shadowStatus = Shadow_GetTopicString(ShadowTopicStringTypeGetAccepted,
-                                              thingName,
-                                              strlen(thingName),
-                                              getAcceptedTopicBuffer,
-                                              sizeof(getAcceptedTopicBuffer),
-                                              &getAcceptedTopicLength);
+    auto shadowStatus = Shadow_AssembleTopicString(ShadowTopicStringTypeGetAccepted,
+                                                   thingName,
+                                                   strlen(thingName),
+                                                   shadowName,
+                                                   shadowNameLength,
+                                                   getAcceptedTopicBuffer,
+                                                   sizeof(getAcceptedTopicBuffer),
+                                                   &getAcceptedTopicLength);
     if (shadowStatus != SHADOW_SUCCESS) {
         tr_error("Shadow_GetTopicString error: %d", shadowStatus);
         return shadowStatus;
@@ -556,12 +558,14 @@ int AWSClient::downloadShadowDocument()
     tr_debug("Shadow \"get accepted\" topic: %.*s", getAcceptedTopicLength, getAcceptedTopicBuffer);
 
     // Construct get topic
-    shadowStatus = Shadow_GetTopicString(ShadowTopicStringTypeGet,
-                                         thingName,
-                                         strlen(thingName),
-                                         getTopicBuffer,
-                                         sizeof(getTopicBuffer),
-                                         &getTopicLength);
+    shadowStatus = Shadow_AssembleTopicString(ShadowTopicStringTypeGet,
+                                              thingName,
+                                              strlen(thingName),
+                                              shadowName,
+                                              shadowNameLength,
+                                              getTopicBuffer,
+                                              sizeof(getTopicBuffer),
+                                              &getTopicLength);
     if (shadowStatus != SHADOW_SUCCESS) {
         tr_error("Shadow_GetTopicString error: %d", shadowStatus);
         return shadowStatus;
@@ -604,18 +608,23 @@ unsubscribeAndReturn:
     return ret;
 }
 
-int AWSClient::updateShadowDocument(const char *updateDocument, size_t length)
+int AWSClient::updateShadowDocument(const char *shadowName,
+                                    size_t shadowNameLength,
+                                    const char *updateDocument,
+                                    size_t updateDocumentLength)
 {
     static char updateTopicBuffer[MBED_CONF_AWS_CLIENT_SHADOW_TOPIC_MAX_SIZE] = {0};
     uint16_t updateTopicLength = 0;
 
     // Construct update topic
-    auto shadowStatus = Shadow_GetTopicString(ShadowTopicStringTypeUpdate,
-                                              thingName,
-                                              strlen(thingName),
-                                              updateTopicBuffer,
-                                              sizeof(updateTopicBuffer),
-                                              &updateTopicLength);
+    auto shadowStatus = Shadow_AssembleTopicString(ShadowTopicStringTypeUpdate,
+                                                   thingName,
+                                                   strlen(thingName),
+                                                   shadowName,
+                                                   shadowNameLength,
+                                                   updateTopicBuffer,
+                                                   sizeof(updateTopicBuffer),
+                                                   &updateTopicLength);
     if (shadowStatus != SHADOW_SUCCESS) {
         tr_error("Shadow_GetTopicString error: %d", shadowStatus);
         return shadowStatus;
@@ -623,7 +632,7 @@ int AWSClient::updateShadowDocument(const char *updateDocument, size_t length)
     tr_debug("Shadow \"string update\" topic: %.*s", updateTopicLength, updateTopicBuffer);
 
     // Publish to update topic
-    auto ret = publish(updateTopicBuffer, updateTopicLength, updateDocument, length);
+    auto ret = publish(updateTopicBuffer, updateTopicLength, updateDocument, updateDocumentLength);
     if (ret != 0) {
         tr_error("publish error: %d", ret);
         return ret;

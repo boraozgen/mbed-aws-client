@@ -262,10 +262,12 @@ public:
      * @brief Retrieves the device shadow document.
      *
      * The retrieved document is written to the shadowGetResponse member.
-     *
+     * 
+     * @param shadowName Name of the shadow to be updated.
+     * @param shadowNameLength Length of the shadow name.
      * @return MBED_SUCCESS on success.
      */
-    int downloadShadowDocument();
+    int downloadShadowDocument(const char *shadowName, size_t shadowNameLength);
 
     /**
      * @brief Extracts the desired value of the given key from the retrieved device shadow document.
@@ -285,14 +287,19 @@ public:
     /**
      * @brief Publishes an update to the device shadow.
      *
+     * @param shadowName Name of the shadow to be updated.
+     * @param shadowNameLength Length of the shadow name.
      * @param updateDocument Update document to be published.
      * @param length Length of the update document.
      * @return MBED_SUCCESS on success.
      */
-    int updateShadowDocument(const char *updateDocument, size_t length);
+    int updateShadowDocument(const char *shadowName,
+                             size_t shadowNameLength,
+                             const char *updateDocument,
+                             size_t updateDocumentLength);
 
     /**
-     * @brief Publishes the reported value of the given key to the device shadow.
+     * @brief Publishes the reported value of the given key to the "classic" device shadow.
      *
      * Constructs the update document and calls updateShadowDocument().
      *
@@ -305,7 +312,7 @@ public:
     int publishShadowReportedValue(const char *key, size_t key_length, const char *value, size_t value_length);
 
     /**
-     * @brief Publishes the reported value of the given key to the device shadow.
+     * @brief Publishes the reported value of the given key to the "classic" device shadow.
      *
      * Constructs the update document and calls updateShadowDocument().
      *

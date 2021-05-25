@@ -26,11 +26,16 @@
 
 #include "mbed_trace.h"
 
+#undef TRACE_GROUP
 #define TRACE_GROUP "AWS SDK"
 
+#undef LogError
 #define LogError(message) tr_error message
+#undef LogWarn
 #define LogWarn(message) tr_warn message
+#undef LogInfo
 #define LogInfo(message) tr_info message
+#undef LogDebug
 #define LogDebug(message) tr_debug message
 
 #endif // MBED_CONF_AWS_CLIENT_AWS_SDK_TRACE

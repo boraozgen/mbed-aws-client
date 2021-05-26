@@ -31,6 +31,7 @@
 extern "C"
 {
 #include "shadow.h"
+#include "jobs.h"
 }
 
 // Undef trace group from AWS SDK logging
@@ -679,3 +680,96 @@ void AWSClient::shadowSubscriptionCallback(MQTTPublishInfo_t *pPublishInfo)
 }
 
 #endif // MBED_CONF_AWS_CLIENT_SHADOW
+
+int AWSClient::checkForJobs(SubscriptionManagerCallback_t jobCallback)
+{
+    char topic[JOBS_API_MAX_LENGTH(JOBS_THINGNAME_MAX_LENGTH)];
+    size_t topicLength = 0;
+
+    auto jobs_ret = Jobs_GetTopic(topic,
+                                  sizeof(topic),
+                                  thingName,
+                                  strlen(thingName),
+                                  JobsNextJobChanged,
+                                  &topicLength);
+    if (jobs_ret != JobsSuccess)
+    {
+        tr_error("Jobs_GetTopic error: %d", jobs_ret);
+        return jobs_ret;
+    }
+
+    // Remove any previous subscriptions to the jobs topic filter
+    static const char jobsTopicFilter[] = "$aws/things/+/jobs/#";
+    SubscriptionManager_RemoveCallback(jobsTopicFilter, sizeof(jobsTopicFilter) - 1);
+
+    auto ret = subscribe(topic, topicLength, MQTTQoS0, jobCallback, jobsTopicFilter, sizeof(jobsTopicFilter) - 1);
+    if (ret != 0)
+    {
+        tr_error("subscribe error: %d", ret);
+        return ret;
+    }
+
+    jobs_ret = Jobs_Describe(topic,
+                             sizeof(topic),
+                             thingName,
+                             strlen(thingName),
+                             JOBS_API_JOBID_NEXT,
+                             JOBS_API_JOBID_NEXT_LENGTH,
+                             &topicLength);
+    if (jobs_ret != JobsSuccess)
+    {
+        tr_error("Jobs_Describe error: %d", jobs_ret);
+        return jobs_ret;
+    }
+
+    ret = publish(topic, topicLength, NULL, 0);
+    if (ret != 0)
+    {
+        tr_error("publish error: %d", ret);
+        return ret;
+    }
+
+    ret = processResponses();
+    if (ret != 0)
+    {
+        tr_error("processResponses error: %d", ret);
+        return ret;
+    }
+
+    ret = unsubscribe(topic, topicLength, MQTTQoS0, jobsTopicFilter, sizeof(jobsTopicFilter) - 1);
+    if (ret != 0)
+    {
+        tr_error("unsubscribe error: %d", ret);
+        return ret;
+    }
+
+    return 0;
+}
+
+int AWSClient::updateJob(const char *jobId, size_t jobId_length, const char *report, size_t report_length)
+{
+    char topic[JOBS_API_MAX_LENGTH(JOBS_THINGNAME_MAX_LENGTH)];
+    size_t topicLength = 0;
+
+    auto jobs_ret = Jobs_Update(topic,
+                                sizeof(topic),
+                                thingName,
+                                strlen(thingName),
+                                jobId,
+                                jobId_length,
+                                &topicLength);
+    if (jobs_ret != JobsSuccess)
+    {
+        tr_error("Jobs_Update error: %d", jobs_ret);
+        return jobs_ret;
+    }
+
+    auto ret = publish(topic, topicLength, NULL, 0);
+    if (ret != 0)
+    {
+        tr_error("publish error: %d", ret);
+        return ret;
+    }
+
+    return 0;
+}

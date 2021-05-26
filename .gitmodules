@@ -7,3 +7,6 @@
 [submodule "Device-Shadow-for-AWS-IoT-embedded-sdk"]
 	path = Device-Shadow-for-AWS-IoT-embedded-sdk
 	url = https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk.git
+[submodule "jobs-for-aws-iot-embedded-sdk"]
+	path = jobs-for-aws-iot-embedded-sdk
+	url = https://github.com/aws/jobs-for-aws-iot-embedded-sdk

@@ -325,6 +325,22 @@ public:
 
 #endif // MBED_CONF_AWS_CLIENT_SHADOW
 
+    /**
+     * @brief Checks for jobs.
+     * 
+     * Subscribes to the job response topic and registers the given callback to it.
+     * Sends a DescribeJobExecution request for the next job.
+     * Processes the responses, which should call the callback.
+     * Unsubscribes from the job response topic.
+     * 
+     * @param jobCallback Callback to be called with job response.
+     * @return MBED_SUCCESS on success. 
+     */
+    int checkForJobs(SubscriptionManagerCallback_t jobCallback);
+
+    // TODO receive an status enum and construct report internally
+    int updateJob(const char *jobId, size_t jobId_length, const char *report, size_t report_length);
+
 private:
     /**
      * @brief Construct a new AWSClient object

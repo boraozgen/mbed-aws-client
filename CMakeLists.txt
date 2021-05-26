@@ -51,6 +51,21 @@ target_sources(coreJSON
         ${JSON_SOURCES}
 )
 
+# jobs-for-aws-iot-embedded-sdk
+include(jobs-for-aws-iot-embedded-sdk/jobsFilePaths.cmake)
+
+add_library(jobs-for-aws-iot-embedded-sdk INTERFACE)
+
+target_include_directories(jobs-for-aws-iot-embedded-sdk
+    INTERFACE
+        ${JOBS_INCLUDE_PUBLIC_DIRS}
+)
+
+target_sources(jobs-for-aws-iot-embedded-sdk
+    INTERFACE
+        ${JOBS_SOURCES}
+)
+
 # mbed-client-for-aws
 
 add_library(mbed-client-for-aws INTERFACE)
@@ -72,6 +87,7 @@ target_link_libraries(mbed-client-for-aws
         coreMQTT
         coreJSON
         Device-Shadow-for-AWS-IoT-embedded-sdk
+        jobs-for-aws-iot-embedded-sdk
         mbed-os
         mbed-netsocket
 )

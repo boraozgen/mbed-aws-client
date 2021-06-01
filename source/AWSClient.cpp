@@ -595,7 +595,7 @@ int AWSClient::downloadShadowDocument(const char *shadowName, size_t shadowNameL
 
     // Check response
     if (!shadowGetAccepted) {
-        tr_error("Shadow get request rejected.");
+        tr_error("Failed to retrieve shadow.");
         ret = -1;
     }
 

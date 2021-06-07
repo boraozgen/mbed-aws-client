@@ -41,6 +41,9 @@ using namespace std;
 using namespace mbed;
 
 #define MQTT_ACK_TIMEOUT (5s)
+#define TOPIC_MAX_LENGTH (256U)
+#define PAYLOAD_MAX_LENGTH (131072U)
+
 static rtos::Semaphore pubackSemaphore(1);
 
 /**
@@ -402,7 +405,17 @@ int AWSClient::publish(const char *topic, uint16_t topic_length, const void *pay
     publishInfo.pPayload = payload;
     publishInfo.payloadLength = payload_length;
 
-    // TODO check for length limit
+    if (topic_length > TOPIC_MAX_LENGTH)
+    {
+        tr_error("Topic too long");
+        return MBED_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (payload_length > PAYLOAD_MAX_LENGTH)
+    {
+        tr_error("Payload too long");
+        return MBED_ERROR_INVALID_ARGUMENT;
+    }
 
     // Packet ID is needed for QoS > 0.
     mutex.lock();

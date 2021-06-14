@@ -26,7 +26,6 @@
 #include "AWSClient.h"
 #include "mbed_trace.h"
 #include "mbed_error.h"
-#include "rtos/Semaphore.h"
 
 extern "C"
 {
@@ -40,11 +39,14 @@ extern "C"
 using namespace std;
 using namespace mbed;
 
-#define MQTT_ACK_TIMEOUT (5s)
 #define TOPIC_MAX_LENGTH (256U)
 #define PAYLOAD_MAX_LENGTH (131072U)
 
-static rtos::Semaphore pubackSemaphore(1);
+// Event flags
+#define PUBACK_FLAG (1UL << 0)
+#define SUBACK_FLAG (1UL << 1)
+#define UNSUBACK_FLAG (1UL << 2)
+#define SHADOW_GET_ACCEPTED_FLAG (1UL << 3)
 
 /**
  * @brief Network send port function.
@@ -122,7 +124,7 @@ void AWSClient::eventCallbackStatic(MQTTContext_t *pMqttContext,
             case MQTT_PACKET_TYPE_PUBACK:
                 tr_debug("PUBACK received for packet id %u",
                          pDeserializedInfo->packetIdentifier);
-                pubackSemaphore.release();
+                awsClient.eventFlags.set(PUBACK_FLAG);
                 break;
 
             case MQTT_PACKET_TYPE_PUBCOMP:
@@ -131,10 +133,12 @@ void AWSClient::eventCallbackStatic(MQTTContext_t *pMqttContext,
 
             case MQTT_PACKET_TYPE_SUBACK:
                 tr_debug("SUBACK");
+                awsClient.eventFlags.set(SUBACK_FLAG);
                 break;
 
             case MQTT_PACKET_TYPE_UNSUBACK:
                 tr_debug("UNSUBACK");
+                awsClient.eventFlags.set(UNSUBACK_FLAG);
                 break;
 
             case MQTT_PACKET_TYPE_PUBREC:
@@ -335,6 +339,8 @@ int AWSClient::subscribe(const char *topicFilter, uint16_t topicFilterLength,
     mutex.lock();
     auto packetId = MQTT_GetPacketId(&mqttContext);
 
+    eventFlags.clear(SUBACK_FLAG);
+
     auto status = MQTT_Subscribe(&mqttContext, subscribeList, 1, packetId);
     mutex.unlock();
     if (status != MQTTSuccess) {
@@ -342,13 +348,13 @@ int AWSClient::subscribe(const char *topicFilter, uint16_t topicFilterLength,
         return status;
     }
 
-    // Call process loop once to receive the ACK
-    mutex.lock();
-    status = MQTT_ProcessLoop(&mqttContext, 0);
-    mutex.unlock();
-    if (status != MQTTSuccess) {
-        tr_error("MQTT ProcessLoop error: %d", status);
-        return status;
+    if (qos == MQTTQoS1)
+    {
+        if (!eventFlags.wait_any_for(SUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
+        {
+            LogError(("Timed out waiting ack for unsubscribe."));
+            return -1;
+        }
     }
 
     mutex.lock();
@@ -377,6 +383,8 @@ int AWSClient::unsubscribe(const char *topicFilter, uint16_t topicFilterLength, 
 
     auto packetId = MQTT_GetPacketId(&mqttContext);
 
+    eventFlags.clear(UNSUBACK_FLAG);
+
     auto status = MQTT_Unsubscribe(&mqttContext, unsubscribeList, 1, packetId);
     mutex.unlock();
     if (status != MQTTSuccess) {
@@ -384,13 +392,13 @@ int AWSClient::unsubscribe(const char *topicFilter, uint16_t topicFilterLength, 
         return status;
     }
 
-    // Call process loop once to receive the ACK
-    mutex.lock();
-    status = MQTT_ProcessLoop(&mqttContext, 0);
-    mutex.unlock();
-    if (status != MQTTSuccess) {
-        tr_error("MQTT ProcessLoop error: %d", status);
-        return status;
+    if (qos == MQTTQoS1)
+    {
+        if (!eventFlags.wait_any_for(UNSUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
+        {
+            LogError(("Timed out waiting ack for unsubscribe."));
+            return -1;
+        }
     }
 
     return status;
@@ -421,6 +429,8 @@ int AWSClient::publish(const char *topic, uint16_t topic_length, const void *pay
     mutex.lock();
     auto packetId = MQTT_GetPacketId(&mqttContext);
 
+    eventFlags.clear(PUBACK_FLAG);
+    
     auto status = MQTT_Publish(&mqttContext, &publishInfo, packetId);
     mutex.unlock();
     if (status != MQTTSuccess) {
@@ -430,9 +440,9 @@ int AWSClient::publish(const char *topic, uint16_t topic_length, const void *pay
 
     if (qos == MQTTQoS1)
     {
-        if (!pubackSemaphore.try_acquire_for(MQTT_ACK_TIMEOUT))
+        if (!eventFlags.wait_any_for(PUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
         {
-            LogError(("Failed to receive ack for publish."));
+            LogError(("Timed out waiting ack for publish."));
             status = (MQTTStatus_t)-1;
         }
     }
@@ -552,9 +562,6 @@ int AWSClient::downloadShadowDocument(const char *shadowName, size_t shadowNameL
     static char getTopicBuffer[MBED_CONF_AWS_CLIENT_SHADOW_TOPIC_MAX_SIZE] = {0};
     uint16_t getTopicLength = 0;
 
-    // Reset get accepted flag
-    shadowGetAccepted = false;
-
     // Construct get/accepted topic
     auto shadowStatus = Shadow_AssembleTopicString(ShadowTopicStringTypeGetAccepted,
                                                    thingName,
@@ -592,23 +599,18 @@ int AWSClient::downloadShadowDocument(const char *shadowName, size_t shadowNameL
         return ret;
     }
 
+    eventFlags.clear(SHADOW_GET_ACCEPTED_FLAG);
+
     // Publish to get topic
     ret = publish(getTopicBuffer, getTopicLength, nullptr, 0);
     if (ret != 0) {
         tr_error("publish error: %d", ret);
         goto unsubscribeAndReturn;
     }
-
-    // Wait for server response
-    ret = processResponses();
-    if (ret != MQTTSuccess) {
-        tr_error("MQTT_ProcessLoop error: %d", ret);
-        goto unsubscribeAndReturn;
-    }
-
-    // Check response
-    if (!shadowGetAccepted) {
-        tr_error("Failed to retrieve shadow.");
+    
+    if (!eventFlags.wait_any_for(SHADOW_GET_ACCEPTED_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
+    {
+        LogError(("Timed out waiting for shadow document."));
         ret = -1;
     }
 
@@ -673,11 +675,11 @@ void AWSClient::shadowSubscriptionCallback(MQTTPublishInfo_t *pPublishInfo)
         {
         case ShadowMessageTypeGetAccepted:
             tr_debug("/get/accepted json payload: %.*s", pPublishInfo->payloadLength, (const char *)pPublishInfo->pPayload);
-            awsClient.shadowGetAccepted = true;
             // Buffer should be large enough to contain the response.
             MBED_ASSERT(pPublishInfo->payloadLength < sizeof(awsClient.shadowGetResponse));
             // Safely store the get response, truncate if necessary.
             snprintf(awsClient.shadowGetResponse, sizeof(awsClient.shadowGetResponse), "%.*s", pPublishInfo->payloadLength, (const char *)pPublishInfo->pPayload);
+            awsClient.eventFlags.set(SHADOW_GET_ACCEPTED_FLAG);
             break;
 
         default:

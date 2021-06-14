@@ -29,6 +29,7 @@
 #include "netsocket/TLSSocket.h"
 #include "platform/Callback.h"
 #include "rtos/Mutex.h"
+#include "rtos/EventFlags.h"
 
 extern "C"
 {
@@ -380,9 +381,15 @@ private:
      */
     const char *thingName;
 
-#if MBED_CONF_AWS_CLIENT_SHADOW
+    /**
+     * @brief Event flags to synchronize ProcessLoop callbacks and the main API.
+     * 
+     * Used for waiting for QoS responses and shadow document.
+     * 
+     */
+    rtos::EventFlags eventFlags;
 
-    bool shadowGetAccepted;
+#if MBED_CONF_AWS_CLIENT_SHADOW
 
     /**
      * @brief Buffer for the shadow get response.

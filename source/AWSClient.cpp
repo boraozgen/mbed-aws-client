@@ -79,6 +79,11 @@ static int32_t Mbed_Recv(NetworkContext_t *pNetworkContext, void *pBuffer, size_
         // Timed out without reading any bytes
         ret = 0;
     }
+    else if (ret == 0)
+    {
+        // Socket is closed.
+        ret = NSAPI_ERROR_NO_CONNECTION;
+    }
 
     // Bytes received
     return ret;

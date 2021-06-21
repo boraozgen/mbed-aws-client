@@ -78,9 +78,7 @@ static int32_t Mbed_Recv(NetworkContext_t *pNetworkContext, void *pBuffer, size_
     if (ret == NSAPI_ERROR_WOULD_BLOCK) {
         // Timed out without reading any bytes
         ret = 0;
-    }
-    else if (ret == 0)
-    {
+    } else if (ret == 0) {
         // Socket is closed.
         ret = NSAPI_ERROR_NO_CONNECTION;
     }
@@ -116,14 +114,11 @@ void AWSClient::eventCallbackStatic(MQTTContext_t *pMqttContext,
     /* Handle incoming publish. The lower 4 bits of the publish packet
      * type is used for the dup, QoS, and retain flags. Hence masking
      * out the lower bits to check if the packet is publish. */
-    if ((pPacketInfo->type & 0xF0U) == MQTT_PACKET_TYPE_PUBLISH)
-    {
+    if ((pPacketInfo->type & 0xF0U) == MQTT_PACKET_TYPE_PUBLISH) {
         MBED_ASSERT(pDeserializedInfo->pPublishInfo != NULL);
         // Forward to subscription manager
         SubscriptionManager_DispatchHandler(pDeserializedInfo->pPublishInfo);
-    }
-    else
-    {
+    } else {
         /* Handle other packets. */
         switch (pPacketInfo->type) {
             case MQTT_PACKET_TYPE_PUBACK:
@@ -335,7 +330,7 @@ const char *AWSClient::getThingName()
     return thingName;
 }
 
-int AWSClient::subscribe(const char *topicFilter, uint16_t topicFilterLength, 
+int AWSClient::subscribe(const char *topicFilter, uint16_t topicFilterLength,
                          const MQTTQoS qos, SubscriptionManagerCallback_t subCallback,
                          const char *callbackTopicFilter, uint16_t callbackTopicFilterLength)
 {
@@ -357,10 +352,8 @@ int AWSClient::subscribe(const char *topicFilter, uint16_t topicFilterLength,
         return status;
     }
 
-    if (qos == MQTTQoS1)
-    {
-        if (!eventFlags.wait_any_for(SUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
-        {
+    if (qos == MQTTQoS1) {
+        if (!eventFlags.wait_any_for(SUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT)) {
             LogError(("Timed out waiting ack for unsubscribe."));
             return -1;
         }
@@ -369,8 +362,7 @@ int AWSClient::subscribe(const char *topicFilter, uint16_t topicFilterLength,
     mutex.lock();
     auto subscriptionStatus = SubscriptionManager_RegisterCallback(callbackTopicFilter, callbackTopicFilterLength, subCallback);
     mutex.unlock();
-    if (subscriptionStatus == SUBSCRIPTION_MANAGER_REGISTRY_FULL)
-    {
+    if (subscriptionStatus == SUBSCRIPTION_MANAGER_REGISTRY_FULL) {
         tr_error("Failed to register a callback to subscription manager with error = %d.", subscriptionStatus);
         return subscriptionStatus;
     }
@@ -401,10 +393,8 @@ int AWSClient::unsubscribe(const char *topicFilter, uint16_t topicFilterLength, 
         return status;
     }
 
-    if (qos == MQTTQoS1)
-    {
-        if (!eventFlags.wait_any_for(UNSUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
-        {
+    if (qos == MQTTQoS1) {
+        if (!eventFlags.wait_any_for(UNSUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT)) {
             LogError(("Timed out waiting ack for unsubscribe."));
             return -1;
         }
@@ -422,14 +412,12 @@ int AWSClient::publish(const char *topic, uint16_t topic_length, const void *pay
     publishInfo.pPayload = payload;
     publishInfo.payloadLength = payload_length;
 
-    if (topic_length > TOPIC_MAX_LENGTH)
-    {
+    if (topic_length > TOPIC_MAX_LENGTH) {
         tr_error("Topic too long");
         return MBED_ERROR_INVALID_ARGUMENT;
     }
 
-    if (payload_length > PAYLOAD_MAX_LENGTH)
-    {
+    if (payload_length > PAYLOAD_MAX_LENGTH) {
         tr_error("Payload too long");
         return MBED_ERROR_INVALID_ARGUMENT;
     }
@@ -439,7 +427,7 @@ int AWSClient::publish(const char *topic, uint16_t topic_length, const void *pay
     auto packetId = MQTT_GetPacketId(&mqttContext);
 
     eventFlags.clear(PUBACK_FLAG);
-    
+
     auto status = MQTT_Publish(&mqttContext, &publishInfo, packetId);
     mutex.unlock();
     if (status != MQTTSuccess) {
@@ -447,12 +435,10 @@ int AWSClient::publish(const char *topic, uint16_t topic_length, const void *pay
         return status;
     }
 
-    if (qos == MQTTQoS1)
-    {
-        if (!eventFlags.wait_any_for(PUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
-        {
+    if (qos == MQTTQoS1) {
+        if (!eventFlags.wait_any_for(PUBACK_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT)) {
             LogError(("Timed out waiting ack for publish."));
-            status = (MQTTStatus_t)-1;
+            status = (MQTTStatus_t) -1;
         }
     }
 
@@ -482,8 +468,9 @@ int AWSClient::processResponses(bool once)
             return status;
         }
 
-        if (once)
+        if (once) {
             break;
+        }
 
     } while (isResponseReceived);
 
@@ -616,9 +603,8 @@ int AWSClient::downloadShadowDocument(const char *shadowName, size_t shadowNameL
         tr_error("publish error: %d", ret);
         goto unsubscribeAndReturn;
     }
-    
-    if (!eventFlags.wait_any_for(SHADOW_GET_ACCEPTED_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT))
-    {
+
+    if (!eventFlags.wait_any_for(SHADOW_GET_ACCEPTED_FLAG, MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT)) {
         LogError(("Timed out waiting for shadow document."));
         ret = -1;
     }
@@ -678,26 +664,24 @@ void AWSClient::shadowSubscriptionCallback(MQTTPublishInfo_t *pPublishInfo)
                                             pPublishInfo->topicNameLength,
                                             &messageType,
                                             &pThingName,
-                                            &thingNameLength))
-    {
-        switch (messageType)
-        {
-        case ShadowMessageTypeGetAccepted:
-            tr_debug("/get/accepted json payload: %.*s", pPublishInfo->payloadLength, (const char *)pPublishInfo->pPayload);
-            // Buffer should be large enough to contain the response.
-            MBED_ASSERT(pPublishInfo->payloadLength < sizeof(awsClient.shadowGetResponse));
-            // Safely store the get response, truncate if necessary.
-            snprintf(awsClient.shadowGetResponse, sizeof(awsClient.shadowGetResponse), "%.*s", pPublishInfo->payloadLength, (const char *)pPublishInfo->pPayload);
-            awsClient.eventFlags.set(SHADOW_GET_ACCEPTED_FLAG);
-            break;
+                                            &thingNameLength)) {
+        switch (messageType) {
+            case ShadowMessageTypeGetAccepted:
+                tr_debug("/get/accepted json payload: %.*s", pPublishInfo->payloadLength, (const char *)pPublishInfo->pPayload);
+                // Buffer should be large enough to contain the response.
+                MBED_ASSERT(pPublishInfo->payloadLength < sizeof(awsClient.shadowGetResponse));
+                // Safely store the get response, truncate if necessary.
+                snprintf(awsClient.shadowGetResponse, sizeof(awsClient.shadowGetResponse), "%.*s", pPublishInfo->payloadLength, (const char *)pPublishInfo->pPayload);
+                awsClient.eventFlags.set(SHADOW_GET_ACCEPTED_FLAG);
+                break;
 
-        default:
-            tr_warn(
-                "Received unexpected shadow message type: %d, payload: %.*s",
-                messageType,
-                pPublishInfo->payloadLength,
-                (const char *)pPublishInfo->pPayload);
-            break;
+            default:
+                tr_warn(
+                    "Received unexpected shadow message type: %d, payload: %.*s",
+                    messageType,
+                    pPublishInfo->payloadLength,
+                    (const char *)pPublishInfo->pPayload);
+                break;
         }
     }
 }

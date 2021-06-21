@@ -302,8 +302,12 @@ bool AWSClient::isConnected()
 
 int AWSClient::disconnect()
 {
+    mutex.lock();
     auto status = MQTT_Disconnect(&mqttContext);
+    mutex.unlock();
     if (status != MQTTSuccess) {
+        // Set to NotConnected since MQTT_Disconnect does not in case of error.
+        mqttContext.connectStatus = MQTTNotConnected;
         tr_error("MQTT disconnect error: %d", status);
         return status;
     }

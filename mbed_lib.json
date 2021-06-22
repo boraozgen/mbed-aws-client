@@ -9,6 +9,10 @@
             "help": "MQTT socket timeout",
             "value": "5s"
         },
+        "recv-timeout": {
+            "help": "Socket receive call timeout. This can be reduced for more responsiveness in case of async ProcessLoop.",
+            "value": "MBED_CONF_AWS_CLIENT_SOCKET_TIMEOUT"
+        },
         "keepalive": {
             "help": "MQTT keep-alive time",
             "value": "60s"

@@ -73,6 +73,9 @@ static int32_t Mbed_Recv(NetworkContext_t *pNetworkContext, void *pBuffer, size_
     MBED_ASSERT(pNetworkContext != nullptr);
     MBED_ASSERT(pBuffer != nullptr);
 
+    auto timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(MBED_CONF_AWS_CLIENT_RECV_TIMEOUT).count();
+    pNetworkContext->socket.set_timeout(timeout_ms);
+
     auto ret = pNetworkContext->socket.recv(pBuffer, bytesToRecv);
 
     if (ret == NSAPI_ERROR_WOULD_BLOCK) {
@@ -286,7 +289,7 @@ int AWSClient::connect(NetworkInterface *net,
 
     MQTTStatus_t mqttStatus;
     bool sessionPresent;
-    mqttStatus = MQTT_Connect(&mqttContext, &connectInfo, NULL, 0, &sessionPresent);
+    mqttStatus = MQTT_Connect(&mqttContext, &connectInfo, NULL, timeout_ms, &sessionPresent);
     if (mqttStatus != MQTTSuccess) {
         tr_error("MQTT connect error: %d", mqttStatus);
         return mqttStatus;
